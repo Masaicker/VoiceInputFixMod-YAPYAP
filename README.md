@@ -3,8 +3,14 @@
 ### Description
 VoiceInputFix is a replacement for the default speech recognition system in YAPYAP. It swaps the original Vosk engine with **Fun-ASR (SenseVoice)** to provide:
 - **Higher Accuracy**: More reliable command recognition.
-- **Multi-language Support**: Automatically recognizes Chinese, English, Japanese, Korean, and Cantonese.
+- **Multi-language Support**: Automatically recognizes Chinese (Mandarin/Cantonese), English, Japanese, and Korean.
 - **Lower Latency**: Faster response times for voice commands.
+
+### Dependencies
+This mod requires the **SherpaOnnxRuntime** package to function. Please ensure it is installed. It provides the necessary core libraries:
+- `onnxruntime.dll`
+- `sherpa-onnx-c-api.dll`
+- `sherpa-onnx.dll`
 
 ### Download Models
 You must download the following files for the mod to work:
@@ -12,7 +18,7 @@ You must download the following files for the mod to work:
 - **tokens.txt** (940KB): [Download](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt) (If the link opens in your browser, press Ctrl+S to save, or right-click the link and select "Save Link As...")
 
 ### Installation
-1. **Critical**: All DLL files (**VoiceInputFix.dll**, **SherpaOnnx.dll**, **onnxruntime.dll**, **sherpa-onnx-c-api.dll**) and the **models** folder **MUST** be in the same directory.
+1. **Critical**: `VoiceInputFix.dll` and the **models** folder **MUST** be in the same directory.
 2. You can place them directly into `BepInEx/plugins/`, or within a subfolder like `BepInEx/plugins/VoiceInputFix/`.
 3. Place the downloaded `model.onnx` and `tokens.txt` inside the **models** folder.
    - Example path: `BepInEx/plugins/VoiceInputFix/models/model.onnx`
@@ -39,8 +45,14 @@ Config file path: `BepInEx/config/Mhz.voiceinputfix.cfg`
 ### 模组简介
 VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游戏原有的 Vosk 引擎替换为 **Fun-ASR (SenseVoice)**，主要改进包括：
 - **识别更精准**：有效减少指令识别错误的情况。
-- **多语言支持**：自动识别中、英、日、韩、粤语，无需手动配置。
+- **多语言支持**：自动识别中（普通话/粤语）、英、日、韩语，无需手动配置。
 - **更低延迟**：语音指令的响应速度比原版更快。
+
+### 必需依赖项
+本模组需要安装 **SherpaOnnxRuntime** 运行库模组才能正常工作。它包含以下核心组件：
+- `onnxruntime.dll`
+- `sherpa-onnx-c-api.dll`
+- `sherpa-onnx.dll`
 
 ### 模型下载
 必须下载以下两个文件，模组才能运行：
@@ -48,7 +60,7 @@ VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游
 - **tokens.txt** (940KB): [点击下载](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt) (若点击后直接打开，请在网页中按 Ctrl+S 保存，或右键点击下载链接选择“链接另存为”)
 
 ### 安装步骤
-1. **核心原则**：所有的 DLL 文件（**VoiceInputFix.dll**, **SherpaOnnx.dll**, **onnxruntime.dll**, **sherpa-onnx-c-api.dll**）与 **models** 文件夹**必须**位于同一目录下。
+1. **核心原则**：`VoiceInputFix.dll` 与 **models** 文件夹**必须**位于同一目录下。
 2. 你可以将它们直接放入 `BepInEx/plugins` 目录，也可以放入 `plugins` 下的任意子文件夹内（**注意：文件夹路径请勿包含中文字符**。例如 `BepInEx/plugins/VoiceInputFix/`）。
 3. 将下载好的 `model.onnx` 和 `tokens.txt` 放入 **models** 文件夹内。
    - 示例路径：`BepInEx/plugins/VoiceInputFix/models/model.onnx`

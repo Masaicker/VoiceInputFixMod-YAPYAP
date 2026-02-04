@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -15,7 +16,7 @@ using UnityEngine;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.0")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.3")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -35,13 +36,20 @@ namespace VoiceInputFix
         private static ConfigEntry<float> _speechThreshold;
         private static string _initError;
         private static string _pluginFolder;
+        private static string _dependencyFolder;
 
         void Awake()
         {
             LogSource = Logger;
             _pluginFolder = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
             
-            // --- Diagnostic & Repair System ---
+            // --- 1. Global Assembly Resolver ---
+            AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+
+            // --- 2. Intelligent Dependency Localization ---
+            LocateDependencies();
+
+            // --- 3. Diagnostic & Repair System ---
             CheckAndRepairModelEnvironment();
 
             // --- Configuration Setup (Bilingual) ---
@@ -51,16 +59,67 @@ namespace VoiceInputFix
             _speechThreshold = Config.Bind("General", "SpeechThreshold", 0.015f, 
                 "Minimum amplitude threshold for speech detection (VAD). | 语音检测的最低振幅阈值（VAD）。建议范围 0.01-0.05。");
 
-            // --- Native DLL Loading ---
-            if (!string.IsNullOrEmpty(_pluginFolder))
-            {
-                SetDllDirectory(_pluginFolder);
-                LoadLibrary(Path.Combine(_pluginFolder, "onnxruntime.dll"));
-                LoadLibrary(Path.Combine(_pluginFolder, "sherpa-onnx-c-api.dll"));
-            }
-
             new Harmony("Mhz.voiceinputfix").PatchAll();
             LogSource.LogInfo("=== [VoiceInputFix] Initialized ===");
+        }
+
+        private void LocateDependencies()
+        {
+            string currentScan = _pluginFolder;
+            string targetDll = "sherpa-onnx-c-api.dll";
+            string foundPath = null;
+
+            // Scan up to 2 levels above plugin folder to cover BepInEx/plugins roots
+            for (int i = 0; i < 3; i++)
+            {
+                if (string.IsNullOrEmpty(currentScan)) break;
+
+                // Priority 1: Direct hit in current folder
+                if (File.Exists(Path.Combine(currentScan, targetDll)))
+                {
+                    foundPath = currentScan;
+                    break;
+                }
+
+                // Priority 2: Search all subdirectories (covers different mod folders)
+                try
+                {
+                    string[] files = Directory.GetFiles(currentScan, targetDll, SearchOption.AllDirectories);
+                    if (files.Length > 0)
+                    {
+                        foundPath = Path.GetDirectoryName(files[0]);
+                        break;
+                    }
+                }
+                catch { /* Ignore restricted folders */ }
+
+                currentScan = Path.GetDirectoryName(currentScan);
+            }
+
+            _dependencyFolder = foundPath;
+
+            if (!string.IsNullOrEmpty(_dependencyFolder))
+            {
+                Log($"Native dependencies located at: {_dependencyFolder}");
+                SetDllDirectory(_dependencyFolder);
+                LoadLibrary(Path.Combine(_dependencyFolder, "onnxruntime.dll"));
+                LoadLibrary(Path.Combine(_dependencyFolder, "sherpa-onnx-c-api.dll"));
+            }
+            else
+            {
+                _initError = "Runtime Missing";
+                LogError("CRITICAL ERROR: Could not find Sherpa-ONNX runtime DLLs! Please install the required dependency package.");
+            }
+        }
+
+        private Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            if (args.Name.Contains("SherpaOnnx"))
+            {
+                string path = Path.Combine(_dependencyFolder ?? _pluginFolder, "SherpaOnnx.dll");
+                if (File.Exists(path)) return Assembly.LoadFrom(path);
+            }
+            return null;
         }
 
         private void CheckAndRepairModelEnvironment()

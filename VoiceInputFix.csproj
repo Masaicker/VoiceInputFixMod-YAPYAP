@@ -5,7 +5,7 @@
         <AssemblyName>VoiceInputFix</AssemblyName>
         <Description>Replace YAPYAP original Vosk engine with Fun-ASR (Sherpa-ONNX)</Description>
         <Nullable>disable</Nullable>
-        <Version>1.0.0</Version>
+        <Version>1.0.3</Version>
         <Product>VoiceInputFix</Product>
         <Company>MHZ</Company>
         <Copyright>Copyright © 2026 Masaicker</Copyright>
