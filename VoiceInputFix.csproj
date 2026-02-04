@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <AssemblyName>VoiceInputFix</AssemblyName>
+        <Description>Replace YAPYAP original Vosk engine with Fun-ASR (Sherpa-ONNX)</Description>
+        <Nullable>disable</Nullable>
+        <Version>1.0.0</Version>
+        <Product>VoiceInputFix</Product>
+        <Company>MHZ</Company>
+        <Copyright>Copyright © 2026 Masaicker</Copyright>
+        <Author>Masaicker</Author>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <YAPYAPPath Condition="'$(YAPYAPPath)' == ''">E:\Steam\steamapps\common\YAPYAP\yapyap_Data\Managed\</YAPYAPPath>
+        <BepPath Condition="'$(BepPath)' == ''">E:\Steam\steamapps\common\YAPYAP\BepInEx\core\</BepPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all" />
+        <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.12.23" GeneratePathProperty="true" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="$(YAPYAPPath)Assembly-CSharp*" Publicize="true" Private="false" />
+        <Reference Include="$(YAPYAPPath)Unity*" Private="false" />
+        <Reference Include="$(YAPYAPPath)UnityEngine*" Private="false" />
+        <Reference Include="$(YAPYAPPath)Unity.RenderPipelines.Universal.Runtime.dll" Publicize="true" Private="false" />
+        <Reference Include="$(BepPath)0Harmony.dll" Private="false" />
+        <Reference Include="$(BepPath)BepInEx.dll" Private="false" />
+    </ItemGroup>
+
+    <!-- ReSharper 有 I/O 错误，暂时注释掉自动复制。用命令行 dotnet build 或手动复制 DLL -->
+    <!--<ItemGroup>
+        <NativeDlls Include="$(NuGetPackageRoot)org.k2fsa.sherpa.onnx.runtime.win-x64\1.12.23\runtimes\win-x64\native\*.dll" />
+        <ManagedSherpa Include="$(NuGetPackageRoot)org.k2fsa.sherpa.onnx\1.12.23\lib\netstandard2.0\*.dll" />
+    </ItemGroup>
+
+    <Target Name="CopySherpaDlls" AfterTargets="Build">
+        <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(ManagedSherpa)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    </Target>-->
+
+
+
+</Project>

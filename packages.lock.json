@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "dependencies": {
+    ".NETStandard,Version=v2.1": {
+      "BepInEx.AssemblyPublicizer.MSBuild": {
+        "type": "Direct",
+        "requested": "[0.4.3, )",
+        "resolved": "0.4.3",
+        "contentHash": "Z8Qs3JTTHZG1q0DCqY+HFJ8xp92tkEXWyQ7roeWgUvn20tjv0ZNfAdyy13XrRS1jeEoN/weJc81747TbvvwaDg=="
+      },
+      "org.k2fsa.sherpa.onnx": {
+        "type": "Direct",
+        "requested": "[1.12.23, )",
+        "resolved": "1.12.23",
+        "contentHash": "MG8PmUYqJQuSLEqjm9s8UCHaUu8TR0UdgZKRzoU6L2X2Kw9q4WLWSfBtNmJpCMgNHxMbCHlyyxg6WzaTgLFZgQ==",
+        "dependencies": {
+          "org.k2fsa.sherpa.onnx.runtime.linux-arm64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.linux-x64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.osx-arm64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.osx-x64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.win-arm64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.win-x64": "1.12.23",
+          "org.k2fsa.sherpa.onnx.runtime.win-x86": "1.12.23"
+        }
+      },
+      "org.k2fsa.sherpa.onnx.runtime.linux-arm64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "NNo33xtAvM1Bqatm88KzFX5cSswFbvSlEJ3ArBVrdSbS9FgnnqIizfJPbM4tpSEuZXSBy/iImJevrCaZdaWm8w=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.linux-x64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "oCGWaFlcnXBU1YSN5WkHyPYyEdpYoghAT9EBAkrp6Z6TOYwDie2qqDwgjat1spHAcvqmUmvfb8hrO7vCiQsSrw=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.osx-arm64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "dYX4WRNLMk9IIlXYKMFq32ORBjVifuTj8FdlJljTFLMBKxtxIkcrEsHpIm6WaWhUeBbSbuF+Kh5nq5sgu8vFDg=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.osx-x64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "W+OfMjL0GyfyswKhYFYZSuwzyo72QRVsPD1Q5VbAvQ9Pu4+Sib4MMZm/KChOaPh2VmOXC8pgiDX6jEQvbJFCUw=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.win-arm64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "RIsL+jwD469CAhsZ5XFsO7Msx0c7iZnQVls+Mv1CQJejWxn0yD22Bwj/+tzYx5J8UXuDpL7RuKqKKbf+t7Fviw=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.win-x64": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "i4H6TD2CzAK+4LJLHPmuTOhEHPLo2pI5eZwmbnOKT/pfzVt/ImAlSUIxsb0qD53EaidJsNx6OBtVnH8ywsHEfw=="
+      },
+      "org.k2fsa.sherpa.onnx.runtime.win-x86": {
+        "type": "Transitive",
+        "resolved": "1.12.23",
+        "contentHash": "ebNDDANGYO/dAJJ2RNB78R3JZ/k+gQx6kwScRRI834WuEJu0RMCupjou/S/JeoHHR31lyyxhnOo7Hot8SXQkog=="
+      }
+    }
+  }
+}

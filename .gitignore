@@ -1,0 +1,64 @@
+# ===================================
+# .NET Build Outputs
+# ===================================
+bin/
+obj/
+out/
+
+# ===================================
+# IDE & Editor Files
+# ===================================
+# JetBrains Rider / IDEA
+.idea/
+*.idea
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# VS Code
+.vscode/
+
+# ===================================
+# Claude Code & MCP Tools (本地开发配置)
+# ===================================
+.claude/
+.serena/
+
+# ===================================
+# Build & Cache Files
+# ===================================
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+
+# ===================================
+# NuGet Packages
+# ===================================
+packages/
+*.nupkg
+!.gitignore
+
+# ===================================
+# OS Generated Files
+# ===================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===================================
+# Keep These (例外情况)
+# ===================================
+!packages.lock.json
+!*.md
+!*.csproj
+!*.sln
