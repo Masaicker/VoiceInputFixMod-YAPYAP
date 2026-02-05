@@ -2,9 +2,11 @@
 
 ### Description
 VoiceInputFix is a replacement for the default speech recognition system in YAPYAP. It swaps the original Vosk engine with **Fun-ASR (SenseVoice)** to provide:
-- **Higher Accuracy**: More reliable command recognition.
-- **Multi-language Support**: Automatically recognizes Chinese (Mandarin/Cantonese)/English/Japanese/Korean. Now supports manual configuration to prioritize a specific language for better stability.
+- **Much Better Chinese Recognition**: The original Vosk engine has poor Chinese support. This mod significantly outperforms Vosk for Chinese commands.
+- **Multi-language Support**: Automatically recognizes Chinese (Mandarin/Cantonese)/English/Japanese/Korean.
 - **Lower Latency**: Faster response times for voice commands.
+
+**Note**: The Fun-ASR model has high recognition accuracy for all languages. However, the original Vosk model was trained with the in-game English voice commands included (like "tempest", "aero"), so it may match them better. For English players, the vanilla Vosk engine is still recommended. Other languages (Japanese, Korean, etc.) have not been extensively tested.
 
 ### Dependencies
 This mod requires the **SherpaOnnxRuntime** package to function. Please ensure it is installed. It provides the necessary core libraries:
@@ -16,6 +18,8 @@ This mod requires the **SherpaOnnxRuntime** package to function. Please ensure i
 You must download the following files for the mod to work:
 - **model.onnx** (1.03GB): [Download](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/model.onnx)
 - **tokens.txt** (940KB): [Download](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt) (If the link opens in your browser, press Ctrl+S to save, or right-click the link and select "Save Link As...")
+
+**Alternative Models**: This mod uses Sherpa-ONNX's SenseVoice series models. If you want to try other models, make sure they are from the **sherpa-onnx-sense-voice** series (search for `csukuangfj/sherpa-onnx-sense-voice` on Hugging Face). The model files must include `model.onnx` and `tokens.txt`, which should be placed in the `models` folder.
 
 ### Installation
 1. **Critical**: `VoiceInputFix.dll` and the **models** folder **MUST** be in the same directory.
@@ -47,9 +51,11 @@ Config file path: `BepInEx/config/Mhz.voiceinputfix.cfg`
 
 ### 模组简介
 VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游戏原有的 Vosk 引擎替换为 **Fun-ASR (SenseVoice)**，主要改进包括：
-- **识别更精准**：有效减少指令识别错误的情况。
-- **多语言支持**：默认自动识别中（普通话/粤语）/英/日/韩语。支持手动指定语言以显著提高特定语言的识别稳定性，减少环境干扰。
+- **中文识别大幅提升**：原版 Vosk 引擎对中文支持较差，本模组在中文指令识别上**显著优于**原版。
+- **多语言支持**：默认自动识别中（普通话/粤语）/英/日/韩语。
 - **更低延迟**：语音指令的响应速度比原版更快。
+
+**注意**：Fun-ASR 模型本身对各种语言的识别准确率都很高。但原版 Vosk 模型的训练数据中包含了游戏内的英文指令词（如 "tempest", "aero"），所以对这些指令词的识别更准确。对于英文玩家，建议继续使用原版 Vosk 引擎。其他语言（日文、韩文等）未进行深度测试。
 
 ### 必需依赖项
 本模组需要安装 **SherpaOnnxRuntime** 运行库模组才能正常工作。它包含以下核心组件：
@@ -60,7 +66,9 @@ VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游
 ### 模型下载
 必须下载以下两个文件，模组才能运行：
 - **model.onnx** (1.03GB): [点击下载](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/model.onnx)
-- **tokens.txt** (940KB): [点击下载](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt) (若点击后直接打开，请在网页中按 Ctrl+S 保存，或右键点击下载链接选择“链接另存为”)
+- **tokens.txt** (940KB): [点击下载](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt) (若点击后直接打开，请在网页中按 Ctrl+S 保存，或右键点击下载链接选择"链接另存为")
+
+**更换其他模型**：本模组使用 Sherpa-ONNX 的 SenseVoice 系列模型。如果你想尝试其他模型，请确保是 **sherpa-onnx-sense-voice** 系列（在 Hugging Face 上搜索 `csukuangfj/sherpa-onnx-sense-voice`）。模型文件必须包含 `model.onnx` 和 `tokens.txt`，放入 `models` 文件夹即可。
 
 ### 安装步骤
 1. **核心原则**：`VoiceInputFix.dll` 与 **models** 文件夹**必须**位于同一目录下。

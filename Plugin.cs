@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.5")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.6")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -391,6 +391,19 @@ namespace VoiceInputFix
             __instance._recognizerReady = true;
             Traverse.Create(__instance).Field("_threadedWorkTask").SetValue(Task.Run(() => Plugin.RecognitionLoop(__instance)));
             return false;
+        }
+    }
+
+
+    [HarmonyPatch(typeof(VoskSpeechToText), "StartVosk")]
+    class PatchStartVosk
+    {
+        static bool Prefix(ref bool ____didInit)
+        {
+            // Block re-initialization triggered by language switching.
+            // Once initialized via our mod, ignore any StartVosk calls with different parameters.
+            if (____didInit) return false;
+            return true;
         }
     }
 }

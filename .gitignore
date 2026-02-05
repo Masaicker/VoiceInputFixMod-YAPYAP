@@ -4,6 +4,7 @@
 bin/
 obj/
 out/
+doc/
 
 # ===================================
 # IDE & Editor Files

@@ -1,3 +1,7 @@
+# v1.0.6
+* 修复玩家在游戏内切换输入语言导致模组失效的问题
+* Fixed mod failure when player switches input language in-game
+
 # v1.0.5
 * 优化诊断弹窗打开文件夹的调用方式，避免极端情况下产生残留进程
 * Optimized folder opening logic in diagnostics to prevent redundant processes in edge cases
