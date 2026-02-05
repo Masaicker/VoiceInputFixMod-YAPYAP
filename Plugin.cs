@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.4")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.5")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -215,7 +215,7 @@ namespace VoiceInputFix
                                   "Click [OK] to open the folder and check README_DOWNLOAD.md.";
 
                 int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00050031);
-                if (result == 1) try { Process.Start("explorer.exe", modelDir); } catch { }
+                if (result == 1) try { Process.Start(new ProcessStartInfo(modelDir) { UseShellExecute = true }); } catch {/* ignored */ }
                 LogError($"[Diagnostic] Missing required files in {modelDir}");
             }
         }

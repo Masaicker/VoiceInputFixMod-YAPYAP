@@ -1,3 +1,7 @@
+# v1.0.5
+* 优化诊断弹窗打开文件夹的调用方式，避免极端情况下产生残留进程
+* Optimized folder opening logic in diagnostics to prevent redundant processes in edge cases
+
 # v1.0.4
 * 改进依赖检测与置顶报错提醒，支持自动复制下载链接
 * 新增 Language 配置项，支持手动指定语言以提高识别准确率（zh, en, ja, ko, yue）
