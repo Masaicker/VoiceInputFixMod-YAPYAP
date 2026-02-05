@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.3")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.4")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -100,7 +100,7 @@ namespace VoiceInputFix
                                   $"{string.Join("\n", missing)}\n\n" +
                                   "Click [OK] to copy a download link to your clipboard, then you can paste it into your browser.";
 
-                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00000011);
+                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00050011);
                 if (result == 1) 
                 {
                     string[] urls = { nexusUrl, thunderstoreUrl };
@@ -114,6 +114,7 @@ namespace VoiceInputFix
             SetDllDirectory(_onnxFolder); 
             LoadLibrary(Path.Combine(_onnxFolder, onnxDll));
             LoadLibrary(Path.Combine(_apiFolder, apiDll));
+            SetDllDirectory(null); // Restore default search path
             
             LogSource.LogInfo($"[VoiceInputFix] Dependencies loaded: API @ {_apiFolder}, ONNX @ {_onnxFolder}, Managed @ {_managedFolder}");
             return true;
@@ -209,7 +210,7 @@ namespace VoiceInputFix
                                   "The mod and original voice recognition will be disabled without these files, but the game will run normally. \n" +
                                   "Click [OK] to open the folder and check README_DOWNLOAD.md.";
 
-                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00000031);
+                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00050031);
                 if (result == 1) try { Process.Start("explorer.exe", modelDir); } catch { }
                 LogError($"[Diagnostic] Missing required files in {modelDir}");
             }
@@ -229,6 +230,7 @@ namespace VoiceInputFix
     {
         private static SherpaOnnx.OfflineRecognizer _recognizer;
         private static readonly object Lock = new object();
+        private static readonly Regex TagRegex = new Regex(@"<\|.*?\|>", RegexOptions.Compiled);
 
         public static void Init(string folder, string initError)
         {
@@ -261,7 +263,7 @@ namespace VoiceInputFix
                 stream.AcceptWaveform(16000, samples);
                 _recognizer.Decode(stream);
                 var rawText = stream.Result.Text;
-                var cleaned = Regex.Replace(rawText, @"<\|.*?\|>", "").Trim();
+                var cleaned = TagRegex.Replace(rawText, "").Trim();
                 return cleaned.Replace("。", "").Replace("，", "").Replace("？", "").Replace("！", "");
             }
         }
