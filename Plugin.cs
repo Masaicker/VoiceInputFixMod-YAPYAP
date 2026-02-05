@@ -11,7 +11,6 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
-using SherpaOnnx;
 using UnityEngine;
 
 namespace VoiceInputFix
@@ -29,30 +28,35 @@ namespace VoiceInputFix
         private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
         public static ManualLogSource LogSource;
-        private static OfflineRecognizer _recognizer;
-        private static readonly object _recognizerLock = new object();
-        
-        private static ConfigEntry<bool> _enableDebugLog;
-        private static ConfigEntry<float> _speechThreshold;
         private static string _initError;
         private static string _pluginFolder;
-        private static string _dependencyFolder;
+        
+        // Independent folders for each DLL
+        private static string _apiFolder;
+        private static string _onnxFolder;
+        private static string _managedFolder;
+
+        private static ConfigEntry<bool> _enableDebugLog;
+        private static ConfigEntry<float> _speechThreshold;
 
         void Awake()
         {
             LogSource = Logger;
-            _pluginFolder = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
+            _pluginFolder = Path.GetDirectoryName(Info.Location);
             
             // --- 1. Global Assembly Resolver ---
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
 
-            // --- 2. Intelligent Dependency Localization ---
-            LocateDependencies();
+            // --- 2. Dependency Check ---
+            bool depsOk = LocateDependencies();
 
-            // --- 3. Diagnostic & Repair System ---
+            // --- 3. Model Check ---
             CheckAndRepairModelEnvironment();
 
-            // --- Configuration Setup (Bilingual) ---
+            // If runtime dependencies are missing, stop initialization
+            if (!depsOk) return;
+
+            // --- 4. Configuration Setup ---
             _enableDebugLog = Config.Bind("General", "EnableDebugLog", false, 
                 "Whether to show detailed recognition logs in the console. | 是否在控制台中显示详细的识别日志。");
             
@@ -63,60 +67,88 @@ namespace VoiceInputFix
             LogSource.LogInfo("=== [VoiceInputFix] Initialized ===");
         }
 
-        private void LocateDependencies()
+        private bool LocateDependencies()
         {
-            string currentScan = _pluginFolder;
-            string targetDll = "sherpa-onnx-c-api.dll";
-            string foundPath = null;
+            const string apiDll = "sherpa-onnx-c-api.dll";
+            const string onnxDll = "onnxruntime.dll";
+            const string managedDll = "sherpa-onnx.dll";
+            
+            // 1. Independent global searches for ALL THREE DLLs
+            _apiFolder = FindFileRecursively(_pluginFolder, apiDll, 4);
+            _onnxFolder = FindFileRecursively(_pluginFolder, onnxDll, 4);
+            _managedFolder = FindFileRecursively(_pluginFolder, managedDll, 4);
 
-            // Scan up to 2 levels above plugin folder to cover BepInEx/plugins roots
-            for (int i = 0; i < 3; i++)
+            // 2. Identify missing components
+            List<string> missing = new List<string>();
+            if (string.IsNullOrEmpty(_apiFolder)) missing.Add($" - {apiDll}");
+            if (string.IsNullOrEmpty(_onnxFolder)) missing.Add($" - {onnxDll}");
+            if (string.IsNullOrEmpty(_managedFolder)) missing.Add($" - {managedDll}");
+
+            if (missing.Count > 0)
+            {
+                _initError = "Dependency Missing";
+                string nexusUrl = "https://www.nexusmods.com/yapyap/mods/5?tab=files";
+                string thunderstoreUrl = "https://thunderstore.io/c/yapyap/p/Mhz/SherpaOnnxRuntime/versions/";
+
+                string errorMsg = "【语音识别运行库缺失】\n\n" +
+                                  "检测到以下核心组件缺失，插件将无法加载：\n" +
+                                  $"{string.Join("\n", missing)}\n\n" +
+                                  "点击【确定】将为您随机复制一个下载链接到剪贴板，您可以直接在浏览器地址栏粘贴（Ctrl+V）访问。\n\n" +
+                                  "--------------------------------------------------\n\n" +
+                                  "[Runtime Dependency Missing]\n\n" +
+                                  "The following core components are missing, the plugin will not load:\n" +
+                                  $"{string.Join("\n", missing)}\n\n" +
+                                  "Click [OK] to copy a download link to your clipboard, then you can paste it into your browser.";
+
+                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00000011);
+                if (result == 1) 
+                {
+                    string[] urls = { nexusUrl, thunderstoreUrl };
+                    GUIUtility.systemCopyBuffer = urls[new System.Random().Next(urls.Length)];
+                }
+                return false;
+            }
+
+            // 3. Load libraries using discovered full paths
+            // We set DLL directory to onnx folder first as API might depend on it
+            SetDllDirectory(_onnxFolder); 
+            LoadLibrary(Path.Combine(_onnxFolder, onnxDll));
+            LoadLibrary(Path.Combine(_apiFolder, apiDll));
+            
+            LogSource.LogInfo($"[VoiceInputFix] Dependencies loaded: API @ {_apiFolder}, ONNX @ {_onnxFolder}, Managed @ {_managedFolder}");
+            return true;
+        }
+
+        private string FindFileRecursively(string startDir, string fileName, int maxLevels)
+        {
+            string currentScan = startDir;
+            for (int i = 0; i < maxLevels; i++)
             {
                 if (string.IsNullOrEmpty(currentScan)) break;
-
-                // Priority 1: Direct hit in current folder
-                if (File.Exists(Path.Combine(currentScan, targetDll)))
-                {
-                    foundPath = currentScan;
-                    break;
-                }
-
-                // Priority 2: Search all subdirectories (covers different mod folders)
+                // Priority check: local folder
+                if (File.Exists(Path.Combine(currentScan, fileName))) return currentScan;
+                // Recursive check: all subfolders
                 try
                 {
-                    string[] files = Directory.GetFiles(currentScan, targetDll, SearchOption.AllDirectories);
-                    if (files.Length > 0)
-                    {
-                        foundPath = Path.GetDirectoryName(files[0]);
-                        break;
-                    }
+                    string[] files = Directory.GetFiles(currentScan, fileName, SearchOption.AllDirectories);
+                    if (files.Length > 0) return Path.GetDirectoryName(files[0]);
                 }
-                catch { /* Ignore restricted folders */ }
+                catch
+                {
+                    // ignored
+                }
 
                 currentScan = Path.GetDirectoryName(currentScan);
             }
-
-            _dependencyFolder = foundPath;
-
-            if (!string.IsNullOrEmpty(_dependencyFolder))
-            {
-                Log($"Native dependencies located at: {_dependencyFolder}");
-                SetDllDirectory(_dependencyFolder);
-                LoadLibrary(Path.Combine(_dependencyFolder, "onnxruntime.dll"));
-                LoadLibrary(Path.Combine(_dependencyFolder, "sherpa-onnx-c-api.dll"));
-            }
-            else
-            {
-                _initError = "Runtime Missing";
-                LogError("CRITICAL ERROR: Could not find Sherpa-ONNX runtime DLLs! Please install the required dependency package.");
-            }
+            return null;
         }
 
         private Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
         {
-            if (args.Name.Contains("SherpaOnnx"))
+            if (args.Name.Contains("sherpa-onnx") || args.Name.Contains("SherpaOnnx"))
             {
-                string path = Path.Combine(_dependencyFolder ?? _pluginFolder, "SherpaOnnx.dll");
+                string folder = _managedFolder ?? _apiFolder ?? _pluginFolder;
+                string path = Path.Combine(folder, "sherpa-onnx.dll");
                 if (File.Exists(path)) return Assembly.LoadFrom(path);
             }
             return null;
@@ -125,188 +157,106 @@ namespace VoiceInputFix
         private void CheckAndRepairModelEnvironment()
         {
             var modelDir = Path.Combine(_pluginFolder, "models");
-            
-            // Ensure directory exists
             if (!Directory.Exists(modelDir)) Directory.CreateDirectory(modelDir);
 
             var modelFile = Path.Combine(modelDir, "model.onnx");
             var tokensFile = Path.Combine(modelDir, "tokens.txt");
             var readmeFile = Path.Combine(modelDir, "README_DOWNLOAD.md");
 
-            // Ensure download guide exists
             if (!File.Exists(readmeFile))
             {
                 string readmeContent = "# VoiceInputFix - Model Download Guide / 模型下载指南\n\n" +
-                                       "Please download the following files and place them in this directory:\n" +
-                                       "请下载以下文件并将它们放入该目录中：\n\n" +
+                                       "Please download the following files and place them in THIS directory (the 'models' folder):\n" +
+                                       "请下载以下文件并将它们放入【当前】目录（即 models 文件夹）中：\n\n" +
                                        "1. **model.onnx** (1.03GB)\n" +
                                        "   URL: https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/model.onnx\n\n" +
                                        "2. **tokens.txt** (940KB)\n" +
                                        "   URL: https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-funasr-nano-2025-12-17/resolve/main/tokens.txt\n\n" +
-                                       "Please start or restart the game after the files are placed correctly. / 文件放置正确后，请启动或重启游戏。";
+                                       "--------------------------------------------------\n\n" +
+                                       "### Optional: Runtime Dependencies / 运行库依赖 (If mod fails to load)\n\n" +
+                                       "If the mod fails to load due to missing native DLLs, please download from:\n" +
+                                       "如果模组因缺少运行库 DLL 无法加载，请从以下地址获取：\n\n" +
+                                       "- NexusMods: https://www.nexusmods.com/yapyap/mods/5?tab=files\n" +
+                                       "- Thunderstore: https://thunderstore.io/c/yapyap/p/Mhz/SherpaOnnxRuntime/versions/\n\n" +
+                                       "Please start or restart the game after all files are placed correctly. / 所有文件放置正确后，请重新启动游戏。";
                 File.WriteAllText(readmeFile, readmeContent);
             }
 
-            // Diagnostic check
             List<string> missing = new List<string>();
             if (!File.Exists(modelFile)) missing.Add(" - model.onnx");
             if (!File.Exists(tokensFile)) missing.Add(" - tokens.txt");
 
             if (missing.Count > 0)
             {
-                _initError = "Files Missing";
+                if (string.IsNullOrEmpty(_initError)) _initError = "Models Missing";
                 string missingFilesStr = string.Join("\n", missing);
                 
-                string errorMsg = "【检测到语音识别模型文件缺失】\n" +
-                                  "缺失文件：\n" +
+                string errorMsg = "【检测到语音识别模型文件缺失】\n\n" +
+                                  "检测到以下模型权重文件缺失：\n" +
                                   $"{missingFilesStr}\n\n" +
                                   "存放目录：\n" +
                                   $"{modelDir}\n\n" +
                                   "状态说明：\n" +
                                   "由于模型文件缺失，本模组及原版语音识别功能将无法生效，但游戏仍可正常进行。\n" +
-                                  "点击确认后将自动为您打开目标目录，请查阅 README_DOWNLOAD.md 获取下载指引。\n\n" +
+                                  "点击确认后将为您打开目标目录，请查阅 README_DOWNLOAD.md 获取下载指引。\n\n" +
                                   "--------------------------------------------------\n\n" +
-                                  "[Model Files Missing]\n" +
+                                  "[Model Files Missing]\n\n" +
                                   "Missing Files:\n" +
                                   $"{missingFilesStr}\n\n" +
                                   "Directory:\n" +
                                   $"{modelDir}\n\n" +
                                   "Notice:\n" +
                                   "The mod and original voice recognition will be disabled without these files, but the game will run normally. \n" +
-                                  "Click OK to open the folder and check README_DOWNLOAD.md.";
+                                  "Click [OK] to open the folder and check README_DOWNLOAD.md.";
 
-                MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00000030); // MB_ICONWARNING
-                
-                try { Process.Start("explorer.exe", modelDir); } catch { }
+                int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00000031);
+                if (result == 1) try { Process.Start("explorer.exe", modelDir); } catch { }
                 LogError($"[Diagnostic] Missing required files in {modelDir}");
             }
         }
 
-        void OnDestroy()
-        {
-            lock (_recognizerLock)
-            {
-                _recognizer?.Dispose();
-                _recognizer = null;
-            }
-        }
+        void OnDestroy() => SherpaEngine.Cleanup();
 
-        internal static void EnsureRecognizer()
+        public static void Log(string m) { if (_enableDebugLog != null && _enableDebugLog.Value) LogSource?.LogInfo(m); }
+        public static void LogError(string m) => LogSource?.LogError(m);
+
+        internal static void EnsureRecognizer() => SherpaEngine.Init(_pluginFolder, _initError);
+        public static string InternalDecode(float[] samples) => SherpaEngine.Decode(samples);
+        public static async Task RecognitionLoop(VoskSpeechToText instance) => await SherpaEngine.RunLoop(instance, _speechThreshold.Value);
+    }
+
+    internal static class SherpaEngine
+    {
+        private static SherpaOnnx.OfflineRecognizer _recognizer;
+        private static readonly object Lock = new object();
+
+        public static void Init(string folder, string initError)
         {
-            if (_recognizer != null || _initError != null) return;
-            lock (_recognizerLock)
+            if (_recognizer != null || initError != null) return;
+            lock (Lock)
             {
                 if (_recognizer != null) return;
                 try
                 {
-                    var modelDir = Path.Combine(_pluginFolder, "models");
-                    var config = new OfflineRecognizerConfig();
+                    var modelDir = Path.Combine(folder, "models");
+                    var config = new SherpaOnnx.OfflineRecognizerConfig();
                     config.ModelConfig.SenseVoice.Model = Path.Combine(modelDir, "model.onnx");
                     config.ModelConfig.SenseVoice.UseInverseTextNormalization = 1;
                     config.ModelConfig.Tokens = Path.Combine(modelDir, "tokens.txt");
                     config.ModelConfig.NumThreads = 4;
                     config.DecodingMethod = "greedy_search";
-
-                    _recognizer = new OfflineRecognizer(config);
-                    Log("Fun-ASR Engine Ready.");
+                    _recognizer = new SherpaOnnx.OfflineRecognizer(config);
+                    Plugin.Log("Fun-ASR Engine Ready.");
                 }
-                catch (Exception ex)
-                {
-                    _initError = ex.ToString();
-                    LogError($"Init Fail: {ex.Message}");
-                }
+                catch (Exception ex) { Plugin.LogError($"Init Fail: {ex.Message}"); }
             }
         }
 
-        public static async Task RecognitionLoop(VoskSpeechToText instance)
+        public static string Decode(float[] samples)
         {
-            EnsureRecognizer();
-            if (_recognizer == null) return;
-
-            var audioAccumulator = new List<float>();
-            var silenceTimer = new Stopwatch();
-            var partialTimer = Stopwatch.StartNew();
-
-            try
+            if (samples == null || samples.Length == 0 || _recognizer == null) return string.Empty;
+            lock (Lock)
             {
-                var bufferQueue = instance._threadedBufferQueue;
-                var resultQueue = instance._threadedResultQueue;
-                int sampleRate = instance._sampleRate;
-
-                while (instance._running)
-                {
-                    bool isFrameLoud = false;
-                    bool hasData = false;
-                    float currentThreshold = _speechThreshold.Value;
-
-                    while (bufferQueue.TryDequeue(out var pcmData))
-                    {
-                        hasData = true;
-                        float frameMax = 0;
-                        float[] frameSamples = new float[pcmData.Length];
-
-                        for (int i = 0; i < pcmData.Length; i++)
-                        {
-                            frameSamples[i] = pcmData[i] / 32768f;
-                            float abs = Math.Abs(frameSamples[i]);
-                            if (abs > frameMax) frameMax = abs;
-                        }
-
-                        if (frameMax > currentThreshold)
-                        {
-                            isFrameLoud = true;
-                            audioAccumulator.AddRange(frameSamples);
-                        }
-                        else if (audioAccumulator.Count > 0)
-                        {
-                            audioAccumulator.AddRange(frameSamples);
-                        }
-                    }
-
-                    if (isFrameLoud) silenceTimer.Restart();
-
-                    if (hasData && audioAccumulator.Count > 0)
-                    {
-                        if (partialTimer.ElapsedMilliseconds > 120 && audioAccumulator.Count > 1600)
-                        {
-                            var text = InternalDecode(audioAccumulator.ToArray());
-                            if (!string.IsNullOrEmpty(text))
-                            {
-                                resultQueue.Enqueue($"{{\"partial\":\"{text.Replace("\"", "\\\"")}\"}}");
-                            }
-                            partialTimer.Restart();
-                        }
-                    }
-
-                    if (audioAccumulator.Count > 0 && (silenceTimer.ElapsedMilliseconds > 350 || audioAccumulator.Count > 160000))
-                    {
-                        var text = InternalDecode(audioAccumulator.ToArray());
-                        if (!string.IsNullOrEmpty(text))
-                        {
-                            Log($"Final: {text}");
-                            resultQueue.Enqueue($"{{\"alternatives\":[{{\"conf\":1.0,\"text\":\"{text.Replace("\"", "\\\"")}\"}}],\"partial\":false}}");
-                        }
-                        resultQueue.Enqueue("{\"partial\":\"[unk]\"}");
-                        audioAccumulator.Clear();
-                        silenceTimer.Reset();
-                        await Task.Delay(100);
-                    }
-                    
-                    await Task.Delay(15);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Loop Error: {ex.Message}");
-            }
-        }
-
-        private static string InternalDecode(float[] samples)
-        {
-            if (samples == null || samples.Length == 0) return string.Empty;
-            lock (_recognizerLock)
-            {
-                if (_recognizer == null) return string.Empty;
                 using var stream = _recognizer.CreateStream();
                 stream.AcceptWaveform(16000, samples);
                 _recognizer.Decode(stream);
@@ -316,13 +266,67 @@ namespace VoiceInputFix
             }
         }
 
-        public static void Log(string m) 
-        { 
-            if (_enableDebugLog != null && _enableDebugLog.Value) 
-                LogSource?.LogInfo(m); 
+        public static void Cleanup()
+        {
+            lock (Lock) { _recognizer?.Dispose(); _recognizer = null; }
         }
-        
-        public static void LogError(string m) => LogSource?.LogError(m);
+
+        public static async Task RunLoop(VoskSpeechToText instance, float threshold)
+        {
+            if (_recognizer == null) return;
+            var audioAccumulator = new List<float>();
+            var silenceTimer = new Stopwatch();
+            var partialTimer = Stopwatch.StartNew();
+            try
+            {
+                var bufferQueue = instance._threadedBufferQueue;
+                var resultQueue = instance._threadedResultQueue;
+                while (instance._running)
+                {
+                    bool isFrameLoud = false;
+                    bool hasData = false;
+                    while (bufferQueue.TryDequeue(out var pcmData))
+                    {
+                        hasData = true;
+                        float[] frameSamples = new float[pcmData.Length];
+                        float frameMax = 0;
+                        for (int i = 0; i < pcmData.Length; i++)
+                        {
+                            frameSamples[i] = pcmData[i] / 32768f;
+                            float abs = Math.Abs(frameSamples[i]);
+                            if (abs > frameMax) frameMax = abs;
+                        }
+                        if (frameMax > threshold) { isFrameLoud = true; audioAccumulator.AddRange(frameSamples); }
+                        else if (audioAccumulator.Count > 0) audioAccumulator.AddRange(frameSamples);
+                    }
+                    if (isFrameLoud) silenceTimer.Restart();
+                    if (hasData && audioAccumulator.Count > 0)
+                    {
+                        if (partialTimer.ElapsedMilliseconds > 120 && audioAccumulator.Count > 1600)
+                        {
+                            var text = Decode(audioAccumulator.ToArray());
+                            if (!string.IsNullOrEmpty(text)) resultQueue.Enqueue($"{{\"partial\":\"{text.Replace("\"", "\\\"")}\"}}");
+                            partialTimer.Restart();
+                        }
+                    }
+                    if (audioAccumulator.Count > 0 && (silenceTimer.ElapsedMilliseconds > 350 || audioAccumulator.Count > 160000))
+                    {
+                        var text = Decode(audioAccumulator.ToArray());
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            Plugin.Log($"Final: {text}");
+                            resultQueue.Enqueue($"{{\"alternatives\":[{{\"conf\":1.0,\"text\":\"{text.Replace("\"", "\\\"")}\"}}],\"partial\":false}}");
+                        }
+                        resultQueue.Enqueue("{\"partial\":\"[unk]\"}");
+                        audioAccumulator.Clear();
+                        silenceTimer.Reset();
+                        await Task.Delay(100);
+                    }
+                    await Task.Delay(15);
+                }
+            }
+            catch (Exception ex) { Plugin.LogError($"Loop Error: {ex.Message}"); }
+        }
     }
 
     [HarmonyPatch(typeof(VoskSpeechToText), "StartupRoutine")]
@@ -339,11 +343,7 @@ namespace VoiceInputFix
             __result = EmptyEnumerator();
             return false; 
         }
-
-        static IEnumerator EmptyEnumerator()
-        {
-            yield break;
-        }
+        static IEnumerator EmptyEnumerator() { yield break; }
     }
 
     [HarmonyPatch(typeof(VoskSpeechToText), "StartRecording")]
