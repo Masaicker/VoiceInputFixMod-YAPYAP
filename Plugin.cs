@@ -38,6 +38,7 @@ namespace VoiceInputFix
 
         private static ConfigEntry<bool> _enableDebugLog;
         private static ConfigEntry<float> _speechThreshold;
+        private static ConfigEntry<string> _language;
 
         void Awake()
         {
@@ -62,6 +63,9 @@ namespace VoiceInputFix
             
             _speechThreshold = Config.Bind("General", "SpeechThreshold", 0.015f, 
                 "Minimum amplitude threshold for speech detection (VAD). | 语音检测的最低振幅阈值（VAD）。建议范围 0.01-0.05。");
+
+            _language = Config.Bind("General", "Language", "auto",
+                "Specified language for recognition. This PRIORITIZES the selected language to improve accuracy, but may still detect others if confidence is high. Options: auto, zh, en, ja, ko, yue. Invalid values will fallback to auto. | 指定识别语言。这会【优先】识别所选语言以提高准确率，但在置信度极高时仍可能识别出其他语言。可选：auto (自动), zh (中文), en (英文), ja (日文), ko (韩文), yue (粤语)。无效值将回退到自动。");
 
             new Harmony("Mhz.voiceinputfix").PatchAll();
             LogSource.LogInfo("=== [VoiceInputFix] Initialized ===");
@@ -221,7 +225,7 @@ namespace VoiceInputFix
         public static void Log(string m) { if (_enableDebugLog != null && _enableDebugLog.Value) LogSource?.LogInfo(m); }
         public static void LogError(string m) => LogSource?.LogError(m);
 
-        internal static void EnsureRecognizer() => SherpaEngine.Init(_pluginFolder, _initError);
+        internal static void EnsureRecognizer() => SherpaEngine.Init(_pluginFolder, _initError, _language.Value);
         public static string InternalDecode(float[] samples) => SherpaEngine.Decode(samples);
         public static async Task RecognitionLoop(VoskSpeechToText instance) => await SherpaEngine.RunLoop(instance, _speechThreshold.Value);
     }
@@ -232,7 +236,7 @@ namespace VoiceInputFix
         private static readonly object Lock = new object();
         private static readonly Regex TagRegex = new Regex(@"<\|.*?\|>", RegexOptions.Compiled);
 
-        public static void Init(string folder, string initError)
+        public static void Init(string folder, string initError, string language = "auto")
         {
             if (_recognizer != null || initError != null) return;
             lock (Lock)
@@ -244,11 +248,30 @@ namespace VoiceInputFix
                     var config = new SherpaOnnx.OfflineRecognizerConfig();
                     config.ModelConfig.SenseVoice.Model = Path.Combine(modelDir, "model.onnx");
                     config.ModelConfig.SenseVoice.UseInverseTextNormalization = 1;
+
+                    // Apply language setting with validation
+                    string lang = language?.ToLower().Trim() ?? "";
+                    switch (lang)
+                    {
+                        case "zh":
+                        case "en":
+                        case "ja":
+                        case "ko":
+                        case "yue":
+                            // Valid codes are kept as is
+                            break;
+                        default:
+                            // All other cases (including "auto", null, or invalid) fallback to ""
+                            lang = ""; 
+                            break;
+                    }
+                    config.ModelConfig.SenseVoice.Language = lang;
+
                     config.ModelConfig.Tokens = Path.Combine(modelDir, "tokens.txt");
                     config.ModelConfig.NumThreads = 4;
                     config.DecodingMethod = "greedy_search";
                     _recognizer = new SherpaOnnx.OfflineRecognizer(config);
-                    Plugin.Log("Fun-ASR Engine Ready.");
+                    Plugin.Log($"Fun-ASR Engine Ready. Language: {(string.IsNullOrEmpty(lang) ? "auto" : lang)}");
                 }
                 catch (Exception ex) { Plugin.LogError($"Init Fail: {ex.Message}"); }
             }
@@ -279,6 +302,8 @@ namespace VoiceInputFix
             var audioAccumulator = new List<float>();
             var silenceTimer = new Stopwatch();
             var partialTimer = Stopwatch.StartNew();
+            string lastSentPartial = string.Empty;
+
             try
             {
                 var bufferQueue = instance._threadedBufferQueue;
@@ -307,7 +332,12 @@ namespace VoiceInputFix
                         if (partialTimer.ElapsedMilliseconds > 120 && audioAccumulator.Count > 1600)
                         {
                             var text = Decode(audioAccumulator.ToArray());
-                            if (!string.IsNullOrEmpty(text)) resultQueue.Enqueue($"{{\"partial\":\"{text.Replace("\"", "\\\"")}\"}}");
+                            // Only send if the recognized text has actually changed
+                            if (!string.IsNullOrEmpty(text) && text != lastSentPartial)
+                            {
+                                resultQueue.Enqueue($"{{\"partial\":\"{text.Replace("\"", "\\\"")}\"}}");
+                                lastSentPartial = text;
+                            }
                             partialTimer.Restart();
                         }
                     }
@@ -321,6 +351,7 @@ namespace VoiceInputFix
                         }
                         resultQueue.Enqueue("{\"partial\":\"[unk]\"}");
                         audioAccumulator.Clear();
+                        lastSentPartial = string.Empty; // Reset for next utterance
                         silenceTimer.Reset();
                         await Task.Delay(100);
                     }

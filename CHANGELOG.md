@@ -1,6 +1,10 @@
 # v1.0.4
 * 改进依赖检测与置顶报错提醒，支持自动复制下载链接
-* Improved dependency detection and top-most error pop-ups with auto-copying links
+* 新增 Language 配置项，支持手动指定语言以提高识别准确率（zh, en, ja, ko, yue）
+* 优化识别输出逻辑，增加内容防抖，解决部分技能（如飞行）重复触发的问题
+* Improved dependency detection and top-most error pop-ups
+* Added Language option to specify language for better accuracy (zh, en, ja, ko, yue)
+* Optimized recognition output with content deduplication to prevent double-triggering spells
 
 # v1.0.3
 * 支持自动搜索依赖库位置，兼容分包安装

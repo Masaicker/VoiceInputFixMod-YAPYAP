@@ -3,7 +3,7 @@
 ### Description
 VoiceInputFix is a replacement for the default speech recognition system in YAPYAP. It swaps the original Vosk engine with **Fun-ASR (SenseVoice)** to provide:
 - **Higher Accuracy**: More reliable command recognition.
-- **Multi-language Support**: Automatically recognizes Chinese (Mandarin/Cantonese), English, Japanese, and Korean.
+- **Multi-language Support**: Automatically recognizes Chinese (Mandarin/Cantonese)/English/Japanese/Korean. Now supports manual configuration to prioritize a specific language for better stability.
 - **Lower Latency**: Faster response times for voice commands.
 
 ### Dependencies
@@ -35,8 +35,11 @@ Config file path: `BepInEx/config/Mhz.voiceinputfix.cfg`
   This is the "Noise Gate". It determines the volume required to trigger recognition.
   - If the mod captures background noise or text stays on screen too long: **Increase** this value (e.g., 0.025).
   - If you have to shout to be heard: **Decrease** this value (e.g., 0.010).
+- **Language** (Default: auto)
+  Specifies the language for recognition. While "auto" works for multiple languages, selecting a specific one improves recognition accuracy and reduces errors.
+  - **auto**: Detect all supported languages automatically: Chinese (Mandarin/Cantonese)/English/Japanese/Korean.
+  - **zh, en, ja, ko, yue**: Enhance the recognition weight for the selected language. Note: This prioritizes matching the chosen language but does not strictly lock it; if an utterance sounds extremely similar to another language, it may still be recognized as such.
 - **EnableDebugLog** (Default: false)
-  Set to `true` if you need to see the recognition details in the BepInEx console.
 
 ---
 
@@ -45,7 +48,7 @@ Config file path: `BepInEx/config/Mhz.voiceinputfix.cfg`
 ### 模组简介
 VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游戏原有的 Vosk 引擎替换为 **Fun-ASR (SenseVoice)**，主要改进包括：
 - **识别更精准**：有效减少指令识别错误的情况。
-- **多语言支持**：自动识别中（普通话/粤语）、英、日、韩语，无需手动配置。
+- **多语言支持**：默认自动识别中（普通话/粤语）/英/日/韩语。支持手动指定语言以显著提高特定语言的识别稳定性，减少环境干扰。
 - **更低延迟**：语音指令的响应速度比原版更快。
 
 ### 必需依赖项
@@ -77,5 +80,8 @@ VoiceInputFix 是一款改进《YAPYAP》语音识别体验的模组。它将游
   这是语音检测的“分贝门槛”。
   - **如果环境吵闹导致文字不消失**：请**调高**此值（例如 0.025 或 0.03）。
   - **如果说话必须很大声才能识别**：请**调低**此值（例如 0.010）。
+- **Language** (默认值: auto)
+  指定识别语言。虽然 "auto" 可以自动处理多语言，但指定特定语言可以显著提高识别率并减少识别错误。
+  - **auto**: 自动识别所有支持的语言：中（普通话/粤语）/ 英 / 日 / 韩语。
+  - **zh, en, ja, ko, yue**: 增强所选语言的识别权重。注意：这仅代表系统会【优先】匹配该语言，并不代表完全锁死；如果发音特征与其它语言极度相似，系统仍可能识别为其它语言。
 - **EnableDebugLog** (默认值: false)
-  设为 `true` 后可以在 BepInEx 控制台中查看详细的识别文本和调试信息。
