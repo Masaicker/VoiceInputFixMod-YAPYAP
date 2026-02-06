@@ -1,3 +1,7 @@
+# v1.0.7
+* 更新md
+* Update md
+
 # v1.0.6
 * 修复玩家在游戏内切换输入语言导致模组失效的问题
 * Fixed mod failure when player switches input language in-game
