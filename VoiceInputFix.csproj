@@ -17,7 +17,7 @@
 
     <PropertyGroup>
         <YAPYAPPath Condition="'$(YAPYAPPath)' == ''">E:\Steam\steamapps\common\YAPYAP\yapyap_Data\Managed\</YAPYAPPath>
-        <BepPath Condition="'$(BepPath)' == ''">E:\Steam\steamapps\common\YAPYAP\BepInEx\core\</BepPath>
+        <BepPath Condition="'$(BepPath)' == ''">D:\zd\ModEditor\Gale\Game\yapyap\profiles\Default\BepInEx\core\</BepPath>
     </PropertyGroup>
 
     <ItemGroup>

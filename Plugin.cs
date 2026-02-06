@@ -215,7 +215,7 @@ namespace VoiceInputFix
                                   "Click [OK] to open the folder and check README_DOWNLOAD.md.";
 
                 int result = MessageBox(IntPtr.Zero, errorMsg, "VoiceInputFix Diagnostic", 0x00050031);
-                if (result == 1) try { Process.Start(new ProcessStartInfo(modelDir) { UseShellExecute = true }); } catch {/* ignored */ }
+                if (result == 1) try { Application.OpenURL(Path.GetFullPath(modelDir)); }catch { /* ignored */ }
                 LogError($"[Diagnostic] Missing required files in {modelDir}");
             }
         }
