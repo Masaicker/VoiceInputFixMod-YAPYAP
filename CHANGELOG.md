@@ -1,3 +1,7 @@
+# v1.0.8
+* 新增自动清理机制，解决因识别文字过多导致的字体空白问题
+* Added auto-cleanup mechanism to fix blank font issues caused by excessive text
+
 # v1.0.7
 * 更新md
 * Update md

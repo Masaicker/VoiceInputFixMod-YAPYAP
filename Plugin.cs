@@ -12,10 +12,12 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
+using TMPro;
+using YAPYAP;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.6")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.8")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -39,6 +41,7 @@ namespace VoiceInputFix
         private static ConfigEntry<bool> _enableDebugLog;
         private static ConfigEntry<float> _speechThreshold;
         private static ConfigEntry<string> _language;
+        private float _lastAutoCleanupTime;
 
         void Awake()
         {
@@ -66,6 +69,8 @@ namespace VoiceInputFix
 
             _language = Config.Bind("General", "Language", "auto",
                 "Specified language for recognition. This PRIORITIZES the selected language to improve accuracy, but may still detect others if confidence is high. Options: auto, zh, en, ja, ko, yue. Invalid values will fallback to auto. | 指定识别语言。这会【优先】识别所选语言以提高准确率，但在置信度极高时仍可能识别出其他语言。可选：auto (自动), zh (中文), en (英文), ja (日文), ko (韩文), yue (粤语)。无效值将回退到自动。");
+
+            _lastAutoCleanupTime = Time.time;
 
             new Harmony("Mhz.voiceinputfix").PatchAll();
             LogSource.LogInfo("=== [VoiceInputFix] Initialized ===");
@@ -220,7 +225,11 @@ namespace VoiceInputFix
             }
         }
 
-        void OnDestroy() => SherpaEngine.Cleanup();
+        void OnDestroy()
+        {
+            AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
+            SherpaEngine.Cleanup();
+        }
 
         public static void Log(string m) { if (_enableDebugLog != null && _enableDebugLog.Value) LogSource?.LogInfo(m); }
         public static void LogError(string m) => LogSource?.LogError(m);
@@ -228,6 +237,87 @@ namespace VoiceInputFix
         internal static void EnsureRecognizer() => SherpaEngine.Init(_pluginFolder, _initError, _language.Value);
         public static string InternalDecode(float[] samples) => SherpaEngine.Decode(samples);
         public static async Task RecognitionLoop(VoskSpeechToText instance) => await SherpaEngine.RunLoop(instance, _speechThreshold.Value);
+
+        void Update()
+        {
+            if (_enableDebugLog.Value)
+            {
+                // 1. Manual Diagnostic (F7) - Debug Only
+                if (Input.GetKeyDown(KeyCode.F7))
+                {
+                    PerformDiagnostic();
+                }
+
+                // 2. Manual Force Cleanup (F8) - Debug Only
+                if (Input.GetKeyDown(KeyCode.F8))
+                {
+                    PerformFontCleanup(0); // Force clear all dynamic fonts
+                }
+            }
+
+            // 3. Periodic Auto Cleanup (Every 10 minutes)
+            if (Time.time - _lastAutoCleanupTime > 600f)
+            {
+                _lastAutoCleanupTime = Time.time;
+                PerformFontCleanup(600); // Only clear fonts > 500 chars
+            }
+        }
+
+        private void PerformDiagnostic()
+        {
+            try
+            {
+                var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+                LogSource.LogInfo("=== [TMP Diagnostic] Current Dynamic Fonts ===");
+                foreach (var font in fonts)
+                {
+                    if (font.atlasPopulationMode == AtlasPopulationMode.Dynamic)
+                    {
+                        LogSource.LogInfo($"Font: {font.name} | Chars: {font.characterLookupTable.Count} | Atlas: {font.atlasTexture.width}x{font.atlasTexture.height}");
+                    }
+                }
+                LogSource.LogInfo("==============================================");
+            }
+            catch (Exception ex) { LogError($"Diagnostic Fail: {ex.Message}"); }
+        }
+
+        public static void PerformFontCleanup(int threshold)
+        {
+            try
+            {
+                var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+                List<TMP_FontAsset> clearedFonts = new List<TMP_FontAsset>();
+                
+                foreach (var font in fonts)
+                {
+                    if (font.atlasPopulationMode == AtlasPopulationMode.Dynamic && font.characterLookupTable.Count >= threshold)
+                    {
+                        LogSource.LogInfo($"[TMP] Cleaning {font.name} ({font.characterLookupTable.Count} chars)...");
+                        font.ClearFontAssetData(true);
+                        font.ReadFontAssetDefinition();
+                        clearedFonts.Add(font);
+                    }
+                }
+
+                if (clearedFonts.Count > 0)
+                {
+                    // Using FindObjectsByType with FindObjectsSortMode.None is faster as it avoids sorting results.
+                    // This is the modern, recommended replacement for FindObjectsOfType.
+                    var activeTexts = FindObjectsByType<TMP_Text>(FindObjectsSortMode.None);
+                    int refreshCount = 0;
+                    foreach (var text in activeTexts)
+                    {
+                        if (text.font != null && clearedFonts.Contains(text.font))
+                        {
+                            text.SetAllDirty();
+                            refreshCount++;
+                        }
+                    }
+                    LogSource.LogInfo($"[TMP] Selective Cleanup Sync Complete. Refreshed {refreshCount} active components.");
+                }
+            }
+            catch (Exception ex) { LogError($"Cleanup Fail: {ex.Message}"); }
+        }
     }
 
     internal static class SherpaEngine
@@ -404,6 +494,17 @@ namespace VoiceInputFix
             // Once initialized via our mod, ignore any StartVosk calls with different parameters.
             if (____didInit) return false;
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(GameManager), "OnGameStateChanged")]
+    class PatchGameStateChanged
+    {
+        static void Postfix()
+        {
+            // Every time game state changes (Lobby <-> Dungeon <-> AstralPlane), 
+            // it's a perfect time to clean up the font atlas.
+            Plugin.PerformFontCleanup(600);
         }
     }
 }

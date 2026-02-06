@@ -5,9 +5,9 @@
         <AssemblyName>VoiceInputFix</AssemblyName>
         <Description>Replace YAPYAP original Vosk engine with Fun-ASR (Sherpa-ONNX)</Description>
         <Nullable>disable</Nullable>
-        <Version>1.0.6</Version>
-        <AssemblyVersion>1.0.6</AssemblyVersion>
-        <FileVersion>1.0.6</FileVersion>
+        <Version>1.0.8</Version>
+        <AssemblyVersion>1.0.8</AssemblyVersion>
+        <FileVersion>1.0.8</FileVersion>
         <Product>VoiceInputFix</Product>
         <Company>MHZ</Company>
         <Copyright>Copyright © 2026 Masaicker</Copyright>
@@ -30,6 +30,7 @@
         <Reference Include="$(YAPYAPPath)Unity*" Private="false" />
         <Reference Include="$(YAPYAPPath)UnityEngine*" Private="false" />
         <Reference Include="$(YAPYAPPath)Unity.RenderPipelines.Universal.Runtime.dll" Publicize="true" Private="false" />
+        <Reference Include="$(YAPYAPPath)Photon*" Private="false" />
         <Reference Include="$(BepPath)0Harmony.dll" Private="false" />
         <Reference Include="$(BepPath)BepInEx.dll" Private="false" />
     </ItemGroup>
