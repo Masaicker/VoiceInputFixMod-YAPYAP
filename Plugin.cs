@@ -34,6 +34,7 @@ namespace VoiceInputFix
         internal static VoiceManager _voiceManager;
         internal static string[] _currentGrammar;
         internal static HashSet<string> _grammarSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        internal static int _maxGrammarLength = 0;
         
         // Independent folders for each DLL
         private static string _apiFolder;
@@ -308,7 +309,8 @@ namespace VoiceInputFix
                     for (int i = 0; i < cleaned.Length; i++)
                     {
                         // Try to match longer keywords first (multi-char phrases)
-                        for (int len = Math.Min(10, cleaned.Length - i); len >= 1; len--)
+                        // Dynamic lookahead based on the longest word in the current grammar
+                        for (int len = Math.Min(Plugin._maxGrammarLength, cleaned.Length - i); len >= 1; len--)
                         {
                             var candidate = cleaned.Substring(i, len);
                             if (Plugin._grammarSet.Contains(candidate))
@@ -451,13 +453,18 @@ namespace VoiceInputFix
             if (Plugin._voiceManager == null) Service.Get(out Plugin._voiceManager);
             Plugin._currentGrammar = Plugin._voiceManager._currentVoskTranslator?.Grammar;
 
-            // Pre-calculate HashSet to save performance in Decode loop
+            // Pre-calculate HashSet and MaxLength to save performance in Decode loop
             Plugin._grammarSet.Clear();
+            Plugin._maxGrammarLength = 0;
             if (Plugin._currentGrammar != null)
             {
                 foreach (var g in Plugin._currentGrammar)
                 {
-                    if (!string.IsNullOrEmpty(g)) Plugin._grammarSet.Add(g);
+                    if (!string.IsNullOrEmpty(g))
+                    {
+                        Plugin._grammarSet.Add(g);
+                        if (g.Length > Plugin._maxGrammarLength) Plugin._maxGrammarLength = g.Length;
+                    }
                 }
             }
 
