@@ -12,12 +12,11 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
-using TMPro;
 using YAPYAP;
 
 namespace VoiceInputFix
 {
-    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.8")]
+    [BepInPlugin("Mhz.voiceinputfix", "VoiceInputFix", "1.0.9")]
     public class Plugin : BaseUnityPlugin
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -32,6 +31,9 @@ namespace VoiceInputFix
         public static ManualLogSource LogSource;
         private static string _initError;
         private static string _pluginFolder;
+        internal static VoiceManager _voiceManager;
+        internal static string[] _currentGrammar;
+        internal static HashSet<string> _grammarSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
         // Independent folders for each DLL
         private static string _apiFolder;
@@ -41,7 +43,6 @@ namespace VoiceInputFix
         private static ConfigEntry<bool> _enableDebugLog;
         private static ConfigEntry<float> _speechThreshold;
         private static ConfigEntry<string> _language;
-        private float _lastAutoCleanupTime;
 
         void Awake()
         {
@@ -69,8 +70,6 @@ namespace VoiceInputFix
 
             _language = Config.Bind("General", "Language", "auto",
                 "Specified language for recognition. This PRIORITIZES the selected language to improve accuracy, but may still detect others if confidence is high. Options: auto, zh, en, ja, ko, yue. Invalid values will fallback to auto. | 指定识别语言。这会【优先】识别所选语言以提高准确率，但在置信度极高时仍可能识别出其他语言。可选：auto (自动), zh (中文), en (英文), ja (日文), ko (韩文), yue (粤语)。无效值将回退到自动。");
-
-            _lastAutoCleanupTime = Time.time;
 
             new Harmony("Mhz.voiceinputfix").PatchAll();
             LogSource.LogInfo("=== [VoiceInputFix] Initialized ===");
@@ -237,94 +236,13 @@ namespace VoiceInputFix
         internal static void EnsureRecognizer() => SherpaEngine.Init(_pluginFolder, _initError, _language.Value);
         public static string InternalDecode(float[] samples) => SherpaEngine.Decode(samples);
         public static async Task RecognitionLoop(VoskSpeechToText instance) => await SherpaEngine.RunLoop(instance, _speechThreshold.Value);
-
-        void Update()
-        {
-            if (_enableDebugLog.Value)
-            {
-                // 1. Manual Diagnostic (F7) - Debug Only
-                if (Input.GetKeyDown(KeyCode.F7))
-                {
-                    PerformDiagnostic();
-                }
-
-                // 2. Manual Force Cleanup (F8) - Debug Only
-                if (Input.GetKeyDown(KeyCode.F8))
-                {
-                    PerformFontCleanup(0); // Force clear all dynamic fonts
-                }
-            }
-
-            // 3. Periodic Auto Cleanup (Every 10 minutes)
-            if (Time.time - _lastAutoCleanupTime > 600f)
-            {
-                _lastAutoCleanupTime = Time.time;
-                PerformFontCleanup(600); // Only clear fonts > 500 chars
-            }
-        }
-
-        private void PerformDiagnostic()
-        {
-            try
-            {
-                var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
-                LogSource.LogInfo("=== [TMP Diagnostic] Current Dynamic Fonts ===");
-                foreach (var font in fonts)
-                {
-                    if (font.atlasPopulationMode == AtlasPopulationMode.Dynamic)
-                    {
-                        LogSource.LogInfo($"Font: {font.name} | Chars: {font.characterLookupTable.Count} | Atlas: {font.atlasTexture.width}x{font.atlasTexture.height}");
-                    }
-                }
-                LogSource.LogInfo("==============================================");
-            }
-            catch (Exception ex) { LogError($"Diagnostic Fail: {ex.Message}"); }
-        }
-
-        public static void PerformFontCleanup(int threshold)
-        {
-            try
-            {
-                var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
-                List<TMP_FontAsset> clearedFonts = new List<TMP_FontAsset>();
-                
-                foreach (var font in fonts)
-                {
-                    if (font.atlasPopulationMode == AtlasPopulationMode.Dynamic && font.characterLookupTable.Count >= threshold)
-                    {
-                        LogSource.LogInfo($"[TMP] Cleaning {font.name} ({font.characterLookupTable.Count} chars)...");
-                        font.ClearFontAssetData(true);
-                        font.ReadFontAssetDefinition();
-                        clearedFonts.Add(font);
-                    }
-                }
-
-                if (clearedFonts.Count > 0)
-                {
-                    // Using FindObjectsByType with FindObjectsSortMode.None is faster as it avoids sorting results.
-                    // This is the modern, recommended replacement for FindObjectsOfType.
-                    var activeTexts = FindObjectsByType<TMP_Text>(FindObjectsSortMode.None);
-                    int refreshCount = 0;
-                    foreach (var text in activeTexts)
-                    {
-                        if (text.font != null && clearedFonts.Contains(text.font))
-                        {
-                            text.SetAllDirty();
-                            refreshCount++;
-                        }
-                    }
-                    LogSource.LogInfo($"[TMP] Selective Cleanup Sync Complete. Refreshed {refreshCount} active components.");
-                }
-            }
-            catch (Exception ex) { LogError($"Cleanup Fail: {ex.Message}"); }
-        }
     }
 
     internal static class SherpaEngine
     {
         private static SherpaOnnx.OfflineRecognizer _recognizer;
         private static readonly object Lock = new object();
-        private static readonly Regex TagRegex = new Regex(@"<\|.*?\|>", RegexOptions.Compiled);
+        private static readonly Regex CleanRegex = new Regex(@"<\|.*?\|>|[。，？！]", RegexOptions.Compiled);
 
         public static void Init(string folder, string initError, string language = "auto")
         {
@@ -367,7 +285,7 @@ namespace VoiceInputFix
             }
         }
 
-        public static string Decode(float[] samples)
+        public static string Decode(float[] samples, string[] grammar = null)
         {
             if (samples == null || samples.Length == 0 || _recognizer == null) return string.Empty;
             lock (Lock)
@@ -376,8 +294,36 @@ namespace VoiceInputFix
                 stream.AcceptWaveform(16000, samples);
                 _recognizer.Decode(stream);
                 var rawText = stream.Result.Text;
-                var cleaned = TagRegex.Replace(rawText, "").Trim();
-                return cleaned.Replace("。", "").Replace("，", "").Replace("？", "").Replace("！", "");
+                Plugin.Log($"[Raw] {rawText}");
+
+                // Optimized cleaning: one regex pass instead of multiple Replace calls
+                var cleaned = CleanRegex.Replace(rawText, "").Trim();
+
+                // Filter-and-Keep: extract whitelist keywords using cached HashSet
+                if (Plugin._grammarSet.Count > 0)
+                {
+                    var result = new List<string>();
+
+                    // Scan text in original order, extract characters/words from grammar
+                    for (int i = 0; i < cleaned.Length; i++)
+                    {
+                        // Try to match longer keywords first (multi-char phrases)
+                        for (int len = Math.Min(10, cleaned.Length - i); len >= 1; len--)
+                        {
+                            var candidate = cleaned.Substring(i, len);
+                            if (Plugin._grammarSet.Contains(candidate))
+                            {
+                                result.Add(candidate);
+                                i += len - 1;  // Skip matched characters
+                                break;
+                            }
+                        }
+                    }
+
+                    return result.Count > 0 ? string.Join(" ", result) : string.Empty;
+                }
+
+                return cleaned;
             }
         }
 
@@ -421,7 +367,7 @@ namespace VoiceInputFix
                     {
                         if (partialTimer.ElapsedMilliseconds > 120 && audioAccumulator.Count > 1600)
                         {
-                            var text = Decode(audioAccumulator.ToArray());
+                            var text = Decode(audioAccumulator.ToArray(), Plugin._currentGrammar);
                             // Only send if the recognized text has actually changed
                             if (!string.IsNullOrEmpty(text) && text != lastSentPartial)
                             {
@@ -433,7 +379,7 @@ namespace VoiceInputFix
                     }
                     if (audioAccumulator.Count > 0 && (silenceTimer.ElapsedMilliseconds > 350 || audioAccumulator.Count > 160000))
                     {
-                        var text = Decode(audioAccumulator.ToArray());
+                        var text = Decode(audioAccumulator.ToArray(), Plugin._currentGrammar);
                         if (!string.IsNullOrEmpty(text))
                         {
                             Plugin.Log($"Final: {text}");
@@ -497,14 +443,25 @@ namespace VoiceInputFix
         }
     }
 
-    [HarmonyPatch(typeof(GameManager), "OnGameStateChanged")]
-    class PatchGameStateChanged
+    [HarmonyPatch(typeof(VoiceManager), "SetLanguage")]
+    class PatchSetLanguage
     {
-        static void Postfix()
+        static void Postfix(VoiceManager __instance)
         {
-            // Every time game state changes (Lobby <-> Dungeon <-> AstralPlane), 
-            // it's a perfect time to clean up the font atlas.
-            Plugin.PerformFontCleanup(600);
+            if (Plugin._voiceManager == null) Service.Get(out Plugin._voiceManager);
+            Plugin._currentGrammar = Plugin._voiceManager._currentVoskTranslator?.Grammar;
+
+            // Pre-calculate HashSet to save performance in Decode loop
+            Plugin._grammarSet.Clear();
+            if (Plugin._currentGrammar != null)
+            {
+                foreach (var g in Plugin._currentGrammar)
+                {
+                    if (!string.IsNullOrEmpty(g)) Plugin._grammarSet.Add(g);
+                }
+            }
+
+            Plugin.Log($"[Grammar] Updated to language: {__instance._currentVoskLocalisation.Language}, count: {Plugin._currentGrammar?.Length ?? 0}");
         }
     }
 }
